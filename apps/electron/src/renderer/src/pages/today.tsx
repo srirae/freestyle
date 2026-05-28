@@ -196,7 +196,12 @@ export default function TodayPage(): React.JSX.Element {
         <div className="h-9 shrink-0" />
         <div
           className="flex-1 overflow-auto px-9 pb-6"
-          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          style={
+            {
+              WebkitAppRegion: "no-drag",
+              scrollbarWidth: "none",
+            } as React.CSSProperties
+          }
         >
           <TutorialDemo />
 
