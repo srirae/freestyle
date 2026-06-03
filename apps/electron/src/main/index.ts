@@ -175,18 +175,40 @@ function getDashboardURL(path = "/"): string {
   return `app://renderer${path}`;
 }
 
-let isProgrammaticMove = false;
+// Tracks the exact coordinates of the last programmatic setPosition call.
+// The move listener compares reported coords against this target and ignores
+// matching events, eliminating the fixed-timeout race condition.
+let programmaticTarget: { x: number; y: number } | null = null;
+let programmaticCleanupTimer: NodeJS.Timeout | null = null;
 
 function setProgrammaticPosition(
   win: BrowserWindow,
   x: number,
   y: number,
 ): void {
-  isProgrammaticMove = true;
+  programmaticTarget = { x, y };
+  // Safety: clear the target after 1s in case the OS never delivers a settle event.
+  if (programmaticCleanupTimer) clearTimeout(programmaticCleanupTimer);
+  programmaticCleanupTimer = setTimeout(() => {
+    programmaticTarget = null;
+    programmaticCleanupTimer = null;
+  }, 1000);
   win.setPosition(x, y);
-  setTimeout(() => {
-    isProgrammaticMove = false;
-  }, 200);
+}
+
+// Returns the pill alignment token for a custom position, using the actual
+// display the window resides on — safe for multi-monitor setups.
+function getPillAlignmentForCustom(): "custom-top" | "custom-bottom" {
+  if (!mainWindow) return "custom-bottom";
+  const [wx, wy] = mainWindow.getPosition();
+  const display = screen.getDisplayMatching({
+    x: wx,
+    y: wy,
+    width: APP_WIDTH,
+    height: APP_HEIGHT,
+  });
+  const midY = display.workArea.y + display.workArea.height / 2;
+  return wy < midY ? "custom-top" : "custom-bottom";
 }
 
 function getAppWindowPosition(): { x: number; y: number } {
@@ -238,7 +260,14 @@ function getAppWindowPosition(): { x: number; y: number } {
 function createAppWindow(): void {
   const { x, y } = getAppWindowPosition();
 
-  isProgrammaticMove = true;
+  // Mark the initial position as programmatic so the move listener ignores it.
+  programmaticTarget = { x, y };
+  if (programmaticCleanupTimer) clearTimeout(programmaticCleanupTimer);
+  programmaticCleanupTimer = setTimeout(() => {
+    programmaticTarget = null;
+    programmaticCleanupTimer = null;
+  }, 1000);
+
   mainWindow = new BrowserWindow({
     width: APP_WIDTH,
     height: APP_HEIGHT,
@@ -262,10 +291,6 @@ function createAppWindow(): void {
     },
   });
 
-  setTimeout(() => {
-    isProgrammaticMove = false;
-  }, 500);
-
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.setVisibleOnAllWorkspaces(true, {
     visibleOnFullScreen: true,
@@ -273,19 +298,40 @@ function createAppWindow(): void {
 
   let moveTimeout: NodeJS.Timeout | null = null;
   mainWindow.on("move", () => {
-    if (isProgrammaticMove) return;
+    if (!mainWindow) return;
+    const [nx, ny] = mainWindow.getPosition();
+
+    // Ignore events that match the programmatic target (the window settling
+    // after a setProgrammaticPosition call). Clear the target once we see
+    // the first matching position so subsequent real drags are captured.
+    if (
+      programmaticTarget &&
+      nx === programmaticTarget.x &&
+      ny === programmaticTarget.y
+    ) {
+      if (programmaticCleanupTimer) clearTimeout(programmaticCleanupTimer);
+      programmaticTarget = null;
+      programmaticCleanupTimer = null;
+      return;
+    }
+
+    // If programmaticTarget is set but coords don't match yet, the window is
+    // still mid-animation — ignore until it settles.
+    if (programmaticTarget) return;
+
     if (moveTimeout) clearTimeout(moveTimeout);
     moveTimeout = setTimeout(() => {
       if (!mainWindow) return;
-      const [nx, ny] = mainWindow.getPosition();
+      const [fx, fy] = mainWindow.getPosition();
       writeSettings({
         pillPosition: "custom",
-        pillCustomPosition: { x: nx, y: ny },
+        pillCustomPosition: { x: fx, y: fy },
       });
-      mainWindow.webContents.send("settings:pill-position-changed", "custom");
+      const alignment = getPillAlignmentForCustom();
+      mainWindow.webContents.send("settings:pill-position-changed", alignment);
       settingsWindow?.webContents.send(
         "settings:pill-position-changed",
-        "custom",
+        alignment,
       );
     }, 200);
   });
@@ -1296,7 +1342,11 @@ app.whenReady().then(async () => {
 
   // -- Pill position setting --
   ipcMain.handle("settings:pill-position", () => {
-    return (readSettings().pillPosition as string) ?? "bottom-center";
+    const pos = (readSettings().pillPosition as string) ?? "bottom-center";
+    // For a custom position, derive the correct top/bottom alignment token
+    // from the actual window position relative to its display.
+    if (pos === "custom") return getPillAlignmentForCustom();
+    return pos;
   });
 
   ipcMain.handle("settings:has-custom-position", () => {
@@ -1312,15 +1362,18 @@ app.whenReady().then(async () => {
 
   ipcMain.on("settings:set-pill-position", (_event, position: string) => {
     writeSettings({ pillPosition: position });
-    // Reposition the window and notify the renderer for CSS alignment
+    // Reposition the window and notify the renderer for CSS alignment.
     if (mainWindow) {
       const { x, y } = getAppWindowPosition();
       setProgrammaticPosition(mainWindow, x, y);
     }
-    mainWindow?.webContents.send("settings:pill-position-changed", position);
+    // For custom, resolve the live alignment; for presets, send as-is.
+    const broadcast =
+      position === "custom" ? getPillAlignmentForCustom() : position;
+    mainWindow?.webContents.send("settings:pill-position-changed", broadcast);
     settingsWindow?.webContents.send(
       "settings:pill-position-changed",
-      position,
+      broadcast,
     );
   });
 

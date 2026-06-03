@@ -766,12 +766,11 @@ export default function AppPage(): React.JSX.Element {
   }, [stopVisualization, hidePill]);
 
   // ---- Preferences ----
+  // The main process sends either a predefined position string (e.g. "top-center")
+  // or a display-relative alignment token ("custom-top" / "custom-bottom").
+  // Using includes("top") covers both cases correctly on all monitor setups.
   const applyPillPosition = useCallback((pos: string | null | undefined) => {
-    const isTop =
-      pos === "custom"
-        ? window.screenY < window.screen.availHeight / 2
-        : !!pos?.startsWith("top");
-    setPillAlign(isTop ? "start" : "end");
+    setPillAlign(pos?.includes("top") ? "start" : "end");
     setPillSide(pos?.endsWith("right") ? "right" : "center");
   }, []);
 
@@ -1045,13 +1044,17 @@ export default function AppPage(): React.JSX.Element {
             style={pillInnerStyle}
           >
             <div
-              style={{
-                width: 29,
-                height: 29,
-                borderRadius: "50%",
-                overflow: "hidden",
-                flexShrink: 0,
-              }}
+              style={
+                {
+                  width: 29,
+                  height: 29,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  // Allow pointer events on the Orb even though the parent is draggable.
+                  WebkitAppRegion: "no-drag",
+                } as React.CSSProperties
+              }
             >
               <Orb
                 colors={
@@ -1082,20 +1085,33 @@ export default function AppPage(): React.JSX.Element {
             {showBars && renderBars(barsSvgRef)}
 
             {state === "error" && (
-              <span style={pillTextStyle}>{message || "Error"}</span>
+              <span
+                style={
+                  {
+                    ...pillTextStyle,
+                    WebkitAppRegion: "no-drag",
+                  } as React.CSSProperties
+                }
+              >
+                {message || "Error"}
+              </span>
             )}
 
             {badge && (
               <span
                 className="mono"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.06em",
-                  opacity: 0.6,
-                  flexShrink: 0,
-                  color: "var(--muted-foreground)",
-                  paddingRight: 5,
-                }}
+                style={
+                  {
+                    fontSize: 10,
+                    letterSpacing: "0.06em",
+                    opacity: 0.6,
+                    flexShrink: 0,
+                    color: "var(--muted-foreground)",
+                    paddingRight: 5,
+                    // Restore pointer events on the badge label.
+                    WebkitAppRegion: "no-drag",
+                  } as React.CSSProperties
+                }
               >
                 {badge}
               </span>
