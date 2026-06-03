@@ -85,7 +85,7 @@ const pillInnerStyle: React.CSSProperties = {
   fontFamily: "'DM Sans', sans-serif",
   fontSize: 13,
   fontWeight: 500,
-  WebkitAppRegion: "no-drag",
+  WebkitAppRegion: "drag",
 } as React.CSSProperties;
 
 const pillTextStyle: React.CSSProperties = {
@@ -767,7 +767,11 @@ export default function AppPage(): React.JSX.Element {
 
   // ---- Preferences ----
   const applyPillPosition = useCallback((pos: string | null | undefined) => {
-    setPillAlign(pos?.startsWith("top") ? "start" : "end");
+    const isTop =
+      pos === "custom"
+        ? window.screenY < window.screen.availHeight / 2
+        : !!pos?.startsWith("top");
+    setPillAlign(isTop ? "start" : "end");
     setPillSide(pos?.endsWith("right") ? "right" : "center");
   }, []);
 

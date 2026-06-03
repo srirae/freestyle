@@ -175,6 +175,20 @@ function getDashboardURL(path = "/"): string {
   return `app://renderer${path}`;
 }
 
+let isProgrammaticMove = false;
+
+function setProgrammaticPosition(
+  win: BrowserWindow,
+  x: number,
+  y: number,
+): void {
+  isProgrammaticMove = true;
+  win.setPosition(x, y);
+  setTimeout(() => {
+    isProgrammaticMove = false;
+  }, 200);
+}
+
 function getAppWindowPosition(): { x: number; y: number } {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
@@ -197,6 +211,22 @@ function getAppWindowPosition(): { x: number; y: number } {
         x: width - APP_WIDTH,
         y: height - APP_HEIGHT + bottomOverlap,
       };
+    case "custom": {
+      const custom = readSettings().pillCustomPosition as
+        | { x: number; y: number }
+        | undefined;
+      if (
+        custom &&
+        typeof custom.x === "number" &&
+        typeof custom.y === "number"
+      ) {
+        return custom;
+      }
+      return {
+        x: Math.round((width - APP_WIDTH) / 2),
+        y: height - APP_HEIGHT + bottomOverlap,
+      };
+    }
     default:
       return {
         x: Math.round((width - APP_WIDTH) / 2),
@@ -208,6 +238,7 @@ function getAppWindowPosition(): { x: number; y: number } {
 function createAppWindow(): void {
   const { x, y } = getAppWindowPosition();
 
+  isProgrammaticMove = true;
   mainWindow = new BrowserWindow({
     width: APP_WIDTH,
     height: APP_HEIGHT,
@@ -231,12 +262,39 @@ function createAppWindow(): void {
     },
   });
 
+  setTimeout(() => {
+    isProgrammaticMove = false;
+  }, 500);
+
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.setVisibleOnAllWorkspaces(true, {
     visibleOnFullScreen: true,
   });
 
+  let moveTimeout: NodeJS.Timeout | null = null;
+  mainWindow.on("move", () => {
+    if (isProgrammaticMove) return;
+    if (moveTimeout) clearTimeout(moveTimeout);
+    moveTimeout = setTimeout(() => {
+      if (!mainWindow) return;
+      const [nx, ny] = mainWindow.getPosition();
+      writeSettings({
+        pillPosition: "custom",
+        pillCustomPosition: { x: nx, y: ny },
+      });
+      mainWindow.webContents.send("settings:pill-position-changed", "custom");
+      settingsWindow?.webContents.send(
+        "settings:pill-position-changed",
+        "custom",
+      );
+    }, 200);
+  });
+
   mainWindow.on("closed", () => {
+    if (moveTimeout) {
+      clearTimeout(moveTimeout);
+      moveTimeout = null;
+    }
     mainWindow = null;
   });
 
@@ -331,7 +389,7 @@ function showPill(): void {
 
   if (!mainWindow.isVisible()) {
     const { x, y } = getAppWindowPosition();
-    mainWindow.setPosition(x, y);
+    setProgrammaticPosition(mainWindow, x, y);
     mainWindow.showInactive();
   }
 
@@ -1241,14 +1299,29 @@ app.whenReady().then(async () => {
     return (readSettings().pillPosition as string) ?? "bottom-center";
   });
 
+  ipcMain.handle("settings:has-custom-position", () => {
+    const custom = readSettings().pillCustomPosition as
+      | { x: number; y: number }
+      | undefined;
+    return !!(
+      custom &&
+      typeof custom.x === "number" &&
+      typeof custom.y === "number"
+    );
+  });
+
   ipcMain.on("settings:set-pill-position", (_event, position: string) => {
     writeSettings({ pillPosition: position });
     // Reposition the window and notify the renderer for CSS alignment
     if (mainWindow) {
       const { x, y } = getAppWindowPosition();
-      mainWindow.setPosition(x, y);
+      setProgrammaticPosition(mainWindow, x, y);
     }
     mainWindow?.webContents.send("settings:pill-position-changed", position);
+    settingsWindow?.webContents.send(
+      "settings:pill-position-changed",
+      position,
+    );
   });
 
   // Register hold-to-record hotkey via native platform binary

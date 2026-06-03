@@ -52,6 +52,7 @@ export default function GeneralSettingsPage(): React.JSX.Element {
   const [language, setLanguage] = useState("auto");
   const [outputMode, setOutputMode] = useState("paste");
   const [pillPosition, setPillPosition] = useState("bottom-center");
+  const [hasCustom, setHasCustom] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [transcriptionPrompt, setTranscriptionPrompt] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState<string | null>(null);
@@ -228,7 +229,16 @@ export default function GeneralSettingsPage(): React.JSX.Element {
       .catch(() => {});
     window.api
       ?.getPillPosition()
-      .then(setPillPosition)
+      .then((pos) => {
+        setPillPosition(pos);
+        if (pos === "custom") {
+          setHasCustom(true);
+        }
+      })
+      .catch(() => {});
+    window.api
+      ?.hasCustomPosition()
+      .then(setHasCustom)
       .catch(() => {});
     getClient()
       .api.settings[":key"].$get({ param: { key: "sound_enabled" } })
@@ -293,6 +303,14 @@ export default function GeneralSettingsPage(): React.JSX.Element {
       })
       .catch(() => {});
 
+    // Pill position live changes
+    const removePillPos = window.api?.onPillPositionChanged((pos) => {
+      setPillPosition(pos);
+      if (pos === "custom") {
+        setHasCustom(true);
+      }
+    });
+
     checkPermissions();
 
     return () => {
@@ -300,6 +318,7 @@ export default function GeneralSettingsPage(): React.JSX.Element {
       removeDownloading?.();
       removeDownloaded?.();
       removeError?.();
+      removePillPos?.();
       if (micPollRef.current) clearInterval(micPollRef.current);
       if (accessibilityPollRef.current)
         clearInterval(accessibilityPollRef.current);
@@ -700,17 +719,25 @@ export default function GeneralSettingsPage(): React.JSX.Element {
             desc="Where the floating pill appears on your screen."
             last
           >
-            <Segment
-              compact
-              options={[
+            {(() => {
+              const positionOptions: SegmentOption[] = [
                 { id: "bottom-center", label: "Bottom · Center" },
                 { id: "bottom-right", label: "Bottom · Right" },
                 { id: "top-center", label: "Top · Center" },
                 { id: "top-right", label: "Top · Right" },
-              ]}
-              active={pillPosition}
-              onSelect={handlePillPositionChange}
-            />
+              ];
+              if (hasCustom) {
+                positionOptions.push({ id: "custom", label: "Custom" });
+              }
+              return (
+                <Segment
+                  compact
+                  options={positionOptions}
+                  active={pillPosition}
+                  onSelect={handlePillPositionChange}
+                />
+              );
+            })()}
           </Row>
         </Section>
 
