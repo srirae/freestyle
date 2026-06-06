@@ -675,6 +675,10 @@ function hidePill(): void {
   } catch {}
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function resetOnboarding(): void {
   writeSettings({ onboardingComplete: false });
   showSettingsWindow("/onboarding");
@@ -1021,7 +1025,10 @@ app.whenReady().then(async () => {
 
   // IPC: paste text at cursor
   ipcMain.handle("paste:text", async (_event, text: string) => {
-    await pasteIntoFocusedApp(text);
+    await pasteIntoFocusedApp(text, async () => {
+      hidePill();
+      await wait(0);
+    });
   });
 
   // IPC: copy text to clipboard
