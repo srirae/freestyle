@@ -11,7 +11,8 @@ import {
   Languages,
   Sliders,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useNavigate } from "react-router";
 
 type NavItem = {
@@ -21,43 +22,64 @@ type NavItem = {
   shortcut: string;
 };
 
-const navItems: NavItem[] = [
-  { to: "/today", label: "Today", icon: BookOpen, shortcut: "1" },
-  { to: "/settings/history", label: "History", icon: Clock, shortcut: "2" },
+const STATIC_NAV = [
+  { to: "/today", icon: BookOpen, shortcut: "1", labelKey: "shell.nav.today" },
+  {
+    to: "/settings/history",
+    icon: Clock,
+    shortcut: "2",
+    labelKey: "shell.nav.history",
+  },
   {
     to: "/settings/dictionary",
-    label: "Dictionary",
     icon: Book,
     shortcut: "3",
+    labelKey: "shell.nav.dictionary",
   },
   {
     to: "/settings/vocabulary",
-    label: "Vocabulary",
     icon: Languages,
     shortcut: "4",
+    labelKey: "shell.nav.vocabulary",
   },
   {
     to: "/settings/formats",
-    label: "Formats",
     icon: FileText,
     shortcut: "5",
+    labelKey: "shell.nav.formats",
   },
-  { to: "/settings/models", label: "Models", icon: Cpu, shortcut: "6" },
-  { to: "/settings", label: "Settings", icon: Sliders, shortcut: "7" },
+  {
+    to: "/settings/models",
+    icon: Cpu,
+    shortcut: "6",
+    labelKey: "shell.nav.models",
+  },
+  {
+    to: "/settings",
+    icon: Sliders,
+    shortcut: "7",
+    labelKey: "shell.nav.settings",
+  },
 ];
 
 export default function AppShell(): React.JSX.Element {
   const navigate = useNavigate();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { t } = useTranslation();
+
+  const navItems: NavItem[] = useMemo(
+    () => STATIC_NAV.map((item) => ({ ...item, label: t(item.labelKey) })),
+    [t],
+  );
 
   // Cmd/Ctrl+1..9 jumps between sidebar items
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const idx = Number(e.key) - 1;
-      if (idx >= 0 && idx < navItems.length) {
+      if (idx >= 0 && idx < STATIC_NAV.length) {
         e.preventDefault();
-        navigate(navItems[idx].to);
+        navigate(STATIC_NAV[idx].to);
       }
     };
     window.addEventListener("keydown", handler);

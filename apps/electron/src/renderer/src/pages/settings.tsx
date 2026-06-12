@@ -1,4 +1,5 @@
 import { KeyComboDisplay } from "@renderer/components/key-combo";
+import { LanguageSelector } from "@renderer/components/language-selector";
 import {
   comboDisplayKeys,
   formatAcceleratorKeys,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getDefaultHotkey } from "../../../shared/hotkey-defaults";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +52,7 @@ function normalizePillPos(pos: string): string {
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage(): React.JSX.Element {
+  const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
@@ -384,15 +387,11 @@ export default function SettingsPage(): React.JSX.Element {
   }, []);
 
   const clearHistory = useCallback(async () => {
-    if (
-      !confirm(
-        "Clear all transcription history? This permanently deletes every saved session.",
-      )
-    ) {
+    if (!confirm(t("settings.data.clearHistoryConfirm"))) {
       return;
     }
     await getClient().api.history.$delete();
-  }, []);
+  }, [t]);
 
   const handleSoundToggle = useCallback((enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -415,14 +414,18 @@ export default function SettingsPage(): React.JSX.Element {
 
   const positionOptions = useMemo<SegmentOption[]>(() => {
     const opts: SegmentOption[] = [
-      { id: "bottom-center", label: "Bottom · Center" },
-      { id: "bottom-right", label: "Bottom · Right" },
-      { id: "top-center", label: "Top · Center" },
-      { id: "top-right", label: "Top · Right" },
+      {
+        id: "bottom-center",
+        label: t("settings.display.positionBottomCenter"),
+      },
+      { id: "bottom-right", label: t("settings.display.positionBottomRight") },
+      { id: "top-center", label: t("settings.display.positionTopCenter") },
+      { id: "top-right", label: t("settings.display.positionTopRight") },
     ];
-    if (pillPosition === "custom") opts.push({ id: "custom", label: "Custom" });
+    if (pillPosition === "custom")
+      opts.push({ id: "custom", label: t("settings.display.positionCustom") });
     return opts;
-  }, [pillPosition]);
+  }, [pillPosition, t]);
 
   return (
     <div
@@ -436,7 +439,9 @@ export default function SettingsPage(): React.JSX.Element {
       >
         <div className="mb-7">
           <h1 className="serif text-foreground m-0 text-[48px] font-normal leading-[0.95] tracking-[-0.025em]">
-            <span className="serif-italic text-primary">Settings</span>
+            <span className="serif-italic text-primary">
+              {t("settings.title")}
+            </span>
             <span>. </span>
           </h1>
         </div>
@@ -447,8 +452,8 @@ export default function SettingsPage(): React.JSX.Element {
               <Download className="text-primary h-4 w-4" />
               <span className="min-w-0 text-sm">
                 {updateDownloaded
-                  ? `Version ${updateAvailable} ready to install`
-                  : `Version ${updateAvailable} available`}
+                  ? t("settings.updateReady", { version: updateAvailable })
+                  : t("settings.updateAvailable", { version: updateAvailable })}
               </span>
             </div>
             {updateDownloaded ? (
@@ -457,7 +462,7 @@ export default function SettingsPage(): React.JSX.Element {
                 onClick={() => window.api?.installUpdate()}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 rounded px-3 py-1 text-xs font-medium"
               >
-                Restart & Update
+                {t("common.restartAndUpdate")}
               </button>
             ) : (
               <button
@@ -470,7 +475,7 @@ export default function SettingsPage(): React.JSX.Element {
                 disabled={downloading}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 rounded px-3 py-1 text-xs font-medium disabled:opacity-50"
               >
-                {downloading ? "Downloading..." : "Download"}
+                {downloading ? t("common.downloading") : t("common.download")}
               </button>
             )}
             {updateError && (
@@ -481,16 +486,26 @@ export default function SettingsPage(): React.JSX.Element {
           </div>
         )}
 
-        <Section label="Application">
+        <Section label={t("settings.sections.interface")}>
           <Row
-            label="Automatic updates"
-            desc="Download new versions in the background as soon as they ship."
+            label={t("settings.interfaceLanguage.label")}
+            desc={t("settings.interfaceLanguage.desc")}
+            last
+          >
+            <LanguageSelector />
+          </Row>
+        </Section>
+
+        <Section label={t("settings.sections.application")}>
+          <Row
+            label={t("settings.application.autoUpdate")}
+            desc={t("settings.application.autoUpdateDesc")}
           >
             <Toggle on={autoUpdate} onChange={handleAutoUpdateToggle} />
           </Row>
           <Row
-            label="Launch at startup"
-            desc="Automatically start Freestyle when you log in to your computer."
+            label={t("settings.application.launchAtStartup")}
+            desc={t("settings.application.launchAtStartupDesc")}
           >
             <Toggle
               on={launchAtStartup}
@@ -498,21 +513,21 @@ export default function SettingsPage(): React.JSX.Element {
             />
           </Row>
           <Row
-            label="Show dashboard on launch"
-            desc="Open the dashboard window when Freestyle starts."
+            label={t("settings.application.showOnLaunch")}
+            desc={t("settings.application.showOnLaunchDesc")}
             last
           >
             <Toggle on={showOnLaunch} onChange={handleShowOnLaunchToggle} />
           </Row>
         </Section>
 
-        <Section label="Recording">
+        <Section label={t("settings.sections.recording")}>
           <Row
-            label="Hotkey"
+            label={t("settings.recording.hotkey")}
             desc={
               hotkeyMode === "toggle"
-                ? "Press the shortcut once to start, press again to stop."
-                : "Hold the shortcut to record, release to transcribe."
+                ? t("settings.recording.hotkeyDescToggle")
+                : t("settings.recording.hotkeyDescHold")
             }
           >
             {recorderState === "idle" ? (
@@ -525,12 +540,12 @@ export default function SettingsPage(): React.JSX.Element {
                   <Keyboard className="text-muted-foreground h-4 w-4 shrink-0" />
                   <KeyComboDisplay keys={formatAcceleratorKeys(hotkey)} />
                   <span className="text-muted-foreground ml-1 text-xs">
-                    Change
+                    {t("common.change")}
                   </span>
                 </button>
                 {invalidReleaseNotice && (
                   <div className="bg-popover text-popover-foreground border-border shadow-soft absolute top-[calc(100%+6px)] right-0 z-20 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs">
-                    Hotkeys need a modifier or side mouse button
+                    {t("settings.recording.needsModifier")}
                   </div>
                 )}
               </div>
@@ -551,7 +566,7 @@ export default function SettingsPage(): React.JSX.Element {
                 )}
                 {invalidReleaseNotice && (
                   <div className="bg-popover text-popover-foreground border-border shadow-soft absolute top-[calc(100%+6px)] right-0 z-20 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs">
-                    Hotkeys need a modifier or side mouse button
+                    {t("settings.recording.needsModifier")}
                   </div>
                 )}
                 <button
@@ -559,18 +574,18 @@ export default function SettingsPage(): React.JSX.Element {
                   onClick={cancelHotkeyRecording}
                   className="border-border hover:bg-secondary ml-1 rounded-md border px-2.5 py-1 text-xs"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </div>
             )}
           </Row>
 
           <Row
-            label="Activation"
+            label={t("settings.recording.activation")}
             desc={
               hotkeyMode === "toggle"
-                ? "Press the shortcut once to start, again to stop."
-                : "Push-to-talk while the shortcut is held."
+                ? t("settings.recording.activationDescToggle")
+                : t("settings.recording.activationDescHold")
             }
           >
             <div className="border-border bg-card inline-flex w-fit shrink-0 rounded-lg border p-0.5 text-sm">
@@ -584,7 +599,7 @@ export default function SettingsPage(): React.JSX.Element {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Hold
+                {t("settings.recording.activationHold")}
               </button>
               <button
                 type="button"
@@ -596,12 +611,15 @@ export default function SettingsPage(): React.JSX.Element {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Toggle
+                {t("settings.recording.activationToggle")}
               </button>
             </div>
           </Row>
 
-          <Row label="Microphone" desc="Select your audio input device.">
+          <Row
+            label={t("settings.recording.microphone")}
+            desc={t("settings.recording.microphoneDesc")}
+          >
             <div className="border-border bg-card text-foreground flex w-full max-w-md items-center gap-2 rounded-lg border px-3 py-2 text-sm">
               <Mic className="text-muted-foreground h-4 w-4 shrink-0" />
               <select
@@ -610,7 +628,9 @@ export default function SettingsPage(): React.JSX.Element {
                 onChange={(e) => handleDeviceChange(e.target.value)}
                 className="w-full min-w-0 truncate bg-transparent pr-6 outline-none"
               >
-                <option value="">System default</option>
+                <option value="">
+                  {t("settings.recording.microphoneDefault")}
+                </option>
                 {devices.map((d) => (
                   <option key={d.deviceId} value={d.deviceId}>
                     {d.label}
@@ -620,7 +640,10 @@ export default function SettingsPage(): React.JSX.Element {
             </div>
           </Row>
 
-          <Row label="Language" desc="Hint for the transcription model.">
+          <Row
+            label={t("settings.recording.language")}
+            desc={t("settings.recording.languageDesc")}
+          >
             <div className="border-border bg-card text-foreground flex w-full max-w-xs items-center gap-2 rounded-lg border px-3 py-2 text-sm">
               <Languages className="text-muted-foreground h-4 w-4 shrink-0" />
               <select
@@ -629,40 +652,51 @@ export default function SettingsPage(): React.JSX.Element {
                 onChange={(e) => handleLanguageChange(e.target.value)}
                 className="w-full min-w-0 truncate bg-transparent pr-6 outline-none"
               >
-                <option value="auto">Auto-detect</option>
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="pt">Portuguese</option>
-                <option value="nl">Dutch</option>
-                <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-                <option value="ar">Arabic</option>
-                <option value="hi">Hindi</option>
-                <option value="pl">Polish</option>
-                <option value="tr">Turkish</option>
-                <option value="sv">Swedish</option>
-                <option value="da">Danish</option>
-                <option value="no">Norwegian</option>
-                <option value="fi">Finnish</option>
-                <option value="uk">Ukrainian</option>
+                {(
+                  [
+                    "auto",
+                    "en",
+                    "es",
+                    "fr",
+                    "de",
+                    "it",
+                    "pt",
+                    "nl",
+                    "ru",
+                    "zh",
+                    "ja",
+                    "ko",
+                    "ar",
+                    "hi",
+                    "pl",
+                    "tr",
+                    "sv",
+                    "da",
+                    "no",
+                    "fi",
+                    "uk",
+                  ] as const
+                ).map((code) => (
+                  <option key={code} value={code}>
+                    {t(`settings.recording.transcriptionLanguages.${code}`)}
+                  </option>
+                ))}
               </select>
             </div>
           </Row>
 
           <Row
-            label="Output mode"
-            desc="Paste into the active app, or copy to clipboard."
+            label={t("settings.recording.outputMode")}
+            desc={t("settings.recording.outputModeDesc")}
           >
             <Segment
               compact
               options={[
-                { id: "paste", label: "Paste into app" },
-                { id: "clipboard", label: "Copy to clipboard" },
+                { id: "paste", label: t("settings.recording.outputModePaste") },
+                {
+                  id: "clipboard",
+                  label: t("settings.recording.outputModeClipboard"),
+                },
               ]}
               active={outputMode}
               onSelect={handleOutputModeChange}
@@ -670,8 +704,8 @@ export default function SettingsPage(): React.JSX.Element {
           </Row>
 
           <Row
-            label="Transcription prompt"
-            desc="List domain terms, names, or jargon to nudge the speech model toward better accuracy."
+            label={t("settings.recording.transcriptionPrompt")}
+            desc={t("settings.recording.transcriptionPromptDesc")}
           >
             <input
               id="settings-transcription-prompt"
@@ -686,14 +720,16 @@ export default function SettingsPage(): React.JSX.Element {
                   })
                   .catch(() => {});
               }}
-              placeholder="e.g. TypeScript, React, Kubernetes, JIRA…"
+              placeholder={t(
+                "settings.recording.transcriptionPromptPlaceholder",
+              )}
               className="border-border bg-card text-foreground w-full max-w-md rounded-lg border px-3 py-2 text-sm"
             />
           </Row>
 
           <Row
-            label="Sound feedback"
-            desc="Soft chimes at the start and end of recording."
+            label={t("settings.recording.sound")}
+            desc={t("settings.recording.soundDesc")}
             last
           >
             <div className="flex items-center gap-2.5">
@@ -707,12 +743,17 @@ export default function SettingsPage(): React.JSX.Element {
           </Row>
         </Section>
 
-        <Section label="Display">
-          <Row label="Theme" desc="Light, dark, or follow your system.">
+        <Section label={t("settings.sections.display")}>
+          <Row
+            label={t("settings.display.theme")}
+            desc={t("settings.display.themeDesc")}
+          >
             <Segment
               options={themeOptions.map((o) => ({
                 id: o.value,
-                label: o.label,
+                label: t(
+                  `settings.display.theme${o.value.charAt(0).toUpperCase()}${o.value.slice(1)}`,
+                ),
                 icon: o.icon,
               }))}
               active={theme ?? "system"}
@@ -720,8 +761,8 @@ export default function SettingsPage(): React.JSX.Element {
             />
           </Row>
           <Row
-            label="Widget position"
-            desc="Where the floating pill appears on your screen."
+            label={t("settings.display.widgetPosition")}
+            desc={t("settings.display.widgetPositionDesc")}
             last
           >
             <Segment
@@ -733,20 +774,20 @@ export default function SettingsPage(): React.JSX.Element {
           </Row>
         </Section>
 
-        <Section label="Permissions">
+        <Section label={t("settings.sections.permissions")}>
           <Row
-            label="Microphone"
-            desc="Required to capture audio for transcription."
+            label={t("settings.permissions.microphone")}
+            desc={t("settings.permissions.microphoneDesc")}
           >
             <PermissionControl
               granted={micStatus === "granted"}
               checking={micStatus === "unknown"}
               actionLabel={
                 micStatus === "denied" && canOpenMicSettings
-                  ? "Open Settings"
+                  ? t("common.openSettings")
                   : micStatus === "granted"
                     ? null
-                    : "Allow"
+                    : t("common.allow")
               }
               external={micStatus === "denied" && canOpenMicSettings}
               onAction={
@@ -758,11 +799,11 @@ export default function SettingsPage(): React.JSX.Element {
             />
           </Row>
           <Row
-            label="Accessibility"
+            label={t("settings.permissions.accessibility")}
             desc={
               isMac
-                ? "Required to detect the global hotkey and paste into other apps. Toggle Freestyle on under System Settings › Privacy & Security › Accessibility."
-                : "Required to detect the global hotkey and paste into other apps."
+                ? t("settings.permissions.accessibilityDescMac")
+                : t("settings.permissions.accessibilityDescOther")
             }
             last
           >
@@ -773,7 +814,7 @@ export default function SettingsPage(): React.JSX.Element {
                 accessibilityStatus === true
                   ? null
                   : isMac
-                    ? "Open Settings"
+                    ? t("common.openSettings")
                     : null
               }
               external={isMac}
@@ -781,17 +822,17 @@ export default function SettingsPage(): React.JSX.Element {
               onManage={isMac ? openAccessibility : undefined}
               note={
                 !isMac && accessibilityStatus !== true
-                  ? "Auto-granted"
+                  ? t("settings.permissions.autoGranted")
                   : undefined
               }
             />
           </Row>
         </Section>
 
-        <Section label="Data" tight>
+        <Section label={t("settings.sections.data")} tight>
           <Row
-            label="Transcription history"
-            desc="Permanently delete every saved session — this can't be undone."
+            label={t("settings.data.history")}
+            desc={t("settings.data.historyDesc")}
             last
           >
             <button
@@ -800,7 +841,7 @@ export default function SettingsPage(): React.JSX.Element {
               className="border-destructive/40 text-destructive hover:bg-destructive/10 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Clear history
+              {t("settings.data.clearHistory")}
             </button>
           </Row>
         </Section>
@@ -963,6 +1004,7 @@ function PermissionControl({
   onManage?: () => void;
   note?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-3">
       <StatusDot granted={granted} checking={checking} />
@@ -975,7 +1017,7 @@ function PermissionControl({
               onClick={onManage}
               className="border-border hover:bg-secondary inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors"
             >
-              Manage
+              {t("common.manage")}
               <ExternalLink className="h-3 w-3" />
             </button>
           )}
@@ -1003,6 +1045,7 @@ function StatusDot({
   granted: boolean;
   checking: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <span
       className={cn(
@@ -1024,7 +1067,11 @@ function StatusDot({
               : "bg-destructive",
         )}
       />
-      {granted ? "Granted" : checking ? "Checking" : "Needed"}
+      {granted
+        ? t("common.granted")
+        : checking
+          ? t("common.checking")
+          : t("common.needed")}
     </span>
   );
 }
